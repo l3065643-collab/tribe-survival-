@@ -1,0 +1,535 @@
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                                   NEXUS MODE ACTIVE                                ║
+-- ║ ══════════════════════════════════════════════════════════════════════════════════ ║
+-- ║                      vaennar hub Premium Edition - Часть 1/2                       ║
+-- ║                               [LOADSTRING EDITION]                                 ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui         = game:GetService("CoreGui")
+local TweenService    = game:GetService("TweenService")
+local HttpService     = game:GetService("HttpService")
+
+local Camera          = workspace.CurrentCamera
+local lp              = Players.LocalPlayer
+
+local oldGui = CoreGui:FindFirstChild("vaennar_Menu") or lp:WaitForChild("PlayerGui"):FindFirstChild("vaennar_Menu")
+if oldGui then 
+    oldGui:Destroy() 
+end
+
+if _G.vaennarConnection then 
+    _G.vaennarConnection:Disconnect() 
+end
+
+_G.vaennarAutoHit = false
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                              КОНФИГУРАЦИЯ И НАСТРОЙКИ                              ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+shared.cfg = {
+    enabled         = true,              
+    espEnabled      = true,              
+    arrowsEnabled   = true,              
+    autoHit         = false,             
+    maxDist         = 3000,              
+
+    mainBg          = Color3.fromRGB(20, 20, 25),
+    accentColor     = Color3.fromRGB(0, 210, 255),
+    textColor       = Color3.fromRGB(255, 255, 255),
+    mutedText       = Color3.fromRGB(150, 155, 170),
+    
+    hpHigh          = Color3.fromRGB(0, 255, 120),
+    hpMid           = Color3.fromRGB(255, 190, 0),
+    hpLow           = Color3.fromRGB(255, 60, 60),
+    hpBg            = Color3.fromRGB(35, 35, 40),
+
+    arrowRadiusPct  = 0.25,              
+    chromaSpeed     = 0.15,              
+}
+
+shared.currentChromaColor = Color3.fromRGB(255, 0, 0)
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                             СОЗДАНИЕ ГРАФИЧЕСКОГО ИНТЕРФЕЙСА                       ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "vaennar_Menu"
+ScreenGui.ResetOnSpawn = false
+
+local success, err = pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not success then
+    ScreenGui.Parent = lp:WaitForChild("PlayerGui")
+end
+
+shared.ESPContainer = ScreenGui:FindFirstChild("ESP_Container") or Instance.new("Folder")
+shared.ESPContainer.Name = "ESP_Container"
+shared.ESPContainer.Parent = ScreenGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 260)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = shared.cfg.mainBg
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Thickness = 2
+MainStroke.Color = shared.currentChromaColor
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Parent = MainFrame
+
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundTransparency = 1
+Header.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "vaennar hub"
+TitleLabel.TextColor3 = shared.currentChromaColor
+TitleLabel.TextSize = 20
+TitleLabel.Font = Enum.Font.FredokaOne
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = Header
+
+local CollapseBtn = Instance.new("TextButton")
+CollapseBtn.Size = UDim2.new(0, 30, 0, 30)
+CollapseBtn.Position = UDim2.new(1, -40, 0, 5)
+CollapseBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+CollapseBtn.Text = "-"
+CollapseBtn.TextColor3 = shared.cfg.textColor
+CollapseBtn.TextSize = 18
+CollapseBtn.Font = Enum.Font.SourceSansBold
+CollapseBtn.Parent = Header
+
+local CollapseCorner = Instance.new("UICorner")
+CollapseCorner.CornerRadius = UDim.new(0, 6)
+CollapseCorner.Parent = CollapseBtn
+
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.Size = UDim2.new(1, -20, 1, -60)
+Content.Position = UDim2.new(0, 10, 0, 50)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 8)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Content
+
+local function createToggle(text, defaultState, callback)
+    local state = defaultState
+    
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 38)
+    Frame.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = Content
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.7, 0, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = shared.cfg.textColor
+    Label.TextSize = 13
+    Label.Font = Enum.Font.SourceSansBold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 50, 0, 22)
+    Button.Position = UDim2.new(1, -62, 0.5, -11)
+    Button.BackgroundColor3 = state and shared.currentChromaColor or Color3.fromRGB(45, 45, 50)
+    Button.Text = state and "ВКЛ" or "ВЫКЛ"
+    Button.TextColor3 = Color3.fromRGB(15, 15, 20)
+    Button.TextSize = 11
+    Button.Font = Enum.Font.SourceSansBold
+    Button.Parent = Frame
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 11)
+    BtnCorner.Parent = Button
+
+    Button.MouseButton1Click:Connect(function()
+        state = not state
+        Button.BackgroundColor3 = state and shared.currentChromaColor or Color3.fromRGB(45, 45, 50)
+        Button.Text = state and "ВКЛ" or "ВЫКЛ"
+        callback(state)
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if state then 
+            Button.BackgroundColor3 = shared.currentChromaColor 
+        end
+    end)
+end
+
+createToggle("Визуальный ESP", shared.cfg.espEnabled, function(val) shared.cfg.espEnabled = val end)
+createToggle("Красивые Стрелки", shared.cfg.arrowsEnabled, function(val) shared.cfg.arrowsEnabled = val end)
+createToggle("Киллаура / Авто-Удар", shared.cfg.autoHit, function(val) shared.cfg.autoHit = val end)
+createToggle("Глобальный переключатель", shared.cfg.enabled, function(val) shared.cfg.enabled = val end)
+
+local collapsed = false
+CollapseBtn.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    if collapsed then
+        Content.Visible = false
+        MainFrame.Size = UDim2.new(0, 280, 0, 40)
+        CollapseBtn.Text = "+"
+    else
+        Content.Visible = true
+        MainFrame.Size = UDim2.new(0, 280, 0, 260)
+        CollapseBtn.Text = "-"
+    end
+end)
+
+shared.MainStroke = MainStroke
+shared.TitleLabel = TitleLabel
+
+local rawUrl = "https://raw.githubusercontent.com/l3065643-collab/tribe-survival-/refs/heads/main/Esp%20tribe"
+
+task.spawn(function()
+    local success, scriptContent = pcall(function()
+        return game:HttpGet(rawUrl)
+    end)
+    
+    if success and scriptContent then
+        local runScript, err = loadstring(scriptContent)
+        if runScript then
+            runScript()
+            print("[Nexus Loadstring]: Часть 2 успешно запущена с GitHub!")
+        else
+            warn("[Nexus Error]: Ошибка компиляции Части 2: " .. tostring(err))
+        end
+    else
+        warn("[Nexus Error]: Не удалось скачать Часть 2 с GitHub.")
+    end
+end)
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                                   NEXUS MODE ACTIVE                                ║
+-- ║ ══════════════════════════════════════════════════════════════════════════════════ ║
+-- ║                      vaennar hub Premium Edition - Часть 2/2                       ║
+-- ║                            [GITHUB STORAGE CORE + AURA]                            ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+
+if not shared.cfg or not shared.ESPContainer then
+    warn("[Nexus Core Error]: Базовая конфигурация первой части не обнаружена!")
+    return
+end
+
+local cfg                = shared.cfg
+local ESPContainer       = shared.ESPContainer
+local MainStroke         = shared.MainStroke
+local TitleLabel         = shared.TitleLabel
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera     = workspace.CurrentCamera
+local lp         = Players.LocalPlayer
+
+-- Настройка дистанции киллауры
+cfg.killAuraRange = 14
+
+local function getHpColor(pct)
+    if pct > 0.66 then 
+        return cfg.hpHigh
+    elseif pct > 0.33 then 
+        return cfg.hpMid
+    else 
+        return cfg.hpLow 
+    end
+end
+
+local function getRoot(char) 
+    return char and char:FindFirstChild("HumanoidRootPart") 
+end
+
+local function getHum(char) 
+    return char and char:FindFirstChildOfClass("Humanoid") 
+end
+
+local espPlayers = {}
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                           КОНСТРУКТОР ЭЛЕМЕНТОВ ESP ДЛЯ ИГРОКА                     ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+local function addPlayerESP(player)
+    if player == lp or espPlayers[player] then return end
+
+    local elements = {}
+
+    local ScreenSpace = Instance.new("Frame")
+    ScreenSpace.Name = player.Name .. "_ScreenESP"
+    ScreenSpace.Size = UDim2.new(0, 100, 0, 50)
+    ScreenSpace.BackgroundTransparency = 1
+    ScreenSpace.Visible = false
+    ScreenSpace.Parent = ESPContainer
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(1, 0, 0, 15)
+    NameLabel.Position = UDim2.new(0, 0, 0, -15)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = player.DisplayName or player.Name
+    NameLabel.TextColor3 = cfg.textColor
+    NameLabel.TextSize = 13
+    NameLabel.Font = Enum.Font.SourceSansBold
+    NameLabel.TextStrokeTransparency = 0
+    NameLabel.Parent = ScreenSpace
+
+    local HPBorder = Instance.new("Frame")
+    HPBorder.Size = UDim2.new(0, 55, 0, 6)
+    HPBorder.Position = UDim2.new(0.5, -27, 0, 3)
+    HPBorder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    HPBorder.BorderSizePixel = 0
+    HPBorder.Parent = ScreenSpace
+
+    local HPBg = Instance.new("Frame")
+    HPBg.Size = UDim2.new(1, -2, 1, -2)
+    HPBg.Position = UDim2.new(0, 1, 0, 1)
+    HPBg.BackgroundColor3 = cfg.hpBg
+    HPBg.BorderSizePixel = 0
+    HPBg.Parent = HPBorder
+
+    local HPFill = Instance.new("Frame")
+    HPFill.Size = UDim2.new(1, 0, 1, 0)
+    HPFill.BackgroundColor3 = cfg.hpHigh
+    HPFill.BorderSizePixel = 0
+    HPFill.Parent = HPBg
+
+    local DistLabel = Instance.new("TextLabel")
+    DistLabel.Size = UDim2.new(1, 0, 0, 12)
+    DistLabel.Position = UDim2.new(0, 0, 0, 10)
+    DistLabel.BackgroundTransparency = 1
+    DistLabel.Text = "0m"
+    DistLabel.TextColor3 = cfg.mutedText
+    DistLabel.TextSize = 11
+    DistLabel.Font = Enum.Font.SourceSansBold
+    DistLabel.TextStrokeTransparency = 0
+    DistLabel.Parent = ScreenSpace
+
+    local ArrowFrame = Instance.new("Frame")
+    ArrowFrame.Name = player.Name .. "_CustomArrow"
+    ArrowFrame.Size = UDim2.new(0, 28, 0, 28)
+    ArrowFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    ArrowFrame.BackgroundTransparency = 1
+    ArrowFrame.Visible = false
+    ArrowFrame.Parent = ESPContainer
+
+    local ArrowImage = Instance.new("ImageLabel")
+    ArrowImage.Name = "ArrowImage"
+    ArrowImage.Size = UDim2.new(1, 0, 1, 0)
+    ArrowImage.BackgroundTransparency = 1
+    ArrowImage.Image = "rbxassetid://6034289357" 
+    ArrowImage.ImageColor3 = cfg.hpHigh
+    ArrowImage.ScaleType = Enum.ScaleType.Fit
+    ArrowImage.Parent = ArrowFrame
+
+    local ArrowDist = Instance.new("TextLabel")
+    ArrowDist.Size = UDim2.new(0, 50, 0, 15)
+    ArrowDist.AnchorPoint = Vector2.new(0.5, 0.5)
+    ArrowDist.BackgroundTransparency = 1
+    ArrowDist.Text = "0m"
+    ArrowDist.TextColor3 = shared.currentChromaColor
+    ArrowDist.TextSize = 10
+    ArrowDist.Font = Enum.Font.SourceSansBold
+    ArrowDist.TextStrokeTransparency = 0.3
+    ArrowDist.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    ArrowDist.Parent = ESPContainer
+
+    elements.ScreenSpace = ScreenSpace
+    elements.HPFill      = HPFill
+    elements.DistLabel   = DistLabel
+    elements.ArrowFrame  = ArrowFrame
+    elements.ArrowImage  = ArrowImage
+    elements.ArrowDist   = ArrowDist
+
+    espPlayers[player] = elements
+end
+
+local function removePlayerESP(player)
+    local elements = espPlayers[player]
+    if elements then
+        pcall(function() elements.ScreenSpace:Destroy() end)
+        pcall(function() elements.ArrowFrame:Destroy() end)
+        pcall(function() elements.ArrowDist:Destroy() end)
+        espPlayers[player] = nil
+    end
+end
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                                   ПОТОК КИЛЛАУРЫ                                   ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+task.spawn(function()
+    while true do
+        if not cfg.enabled or not cfg.autoHit or not lp.Character then 
+            task.wait(0.2)
+        else
+            local myChar = lp.Character
+            local myRoot = getRoot(myChar)
+            
+            if myRoot then
+                local closestEnemy = nil
+                local shortestDist = cfg.killAuraRange
+
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= lp and player.Character then
+                        local enemyRoot = getRoot(player.Character)
+                        local enemyHum  = getHum(player.Character)
+                        
+                        if enemyRoot and enemyHum and enemyHum.Health > 0 then
+                            local currentDist = (myRoot.Position - enemyRoot.Position).Magnitude
+                            if currentDist < shortestDist then
+                                shortestDist = currentDist
+                                closestEnemy = player
+                            end
+                        end
+                    end
+                end
+
+                if closestEnemy then
+                    local tool = myChar:FindFirstChildOfClass("Tool")
+                    if tool then
+                        pcall(function() tool:Activate() end)
+                        
+                        pcall(function()
+                            for _, child in ipairs(tool:GetDescendants()) do
+                                if child:IsA("RemoteEvent") then
+                                    child:FireServer(closestEnemy.Character.HumanoidRootPart)
+                                elseif child:IsA("BindableEvent") then
+                                    child:Fire()
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+            task.wait(0.04)
+        end
+    end
+end)
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════╗
+-- ║                            ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ И РЕНДЕРИНГА                    ║
+-- ╚════════════════════════════════════════════════════════════════════════════════════╗
+_G.vaennarConnection = RunService.RenderStepped:Connect(function()
+    local hue = (tick() * cfg.chromaSpeed) % 1
+    shared.currentChromaColor = Color3.fromHSV(hue, 1, 1)
+
+    if MainStroke and MainStroke.Parent then MainStroke.Color = shared.currentChromaColor end
+    if TitleLabel and TitleLabel.Parent then TitleLabel.TextColor3 = shared.currentChromaColor end
+
+    if not cfg.enabled then
+        for _, elements in pairs(espPlayers) do
+            elements.ScreenSpace.Visible = false
+            elements.ArrowFrame.Visible  = false
+            elements.ArrowDist.Visible   = false
+        end
+        return
+    end
+
+    local myChar = lp.Character
+    local myRoot = getRoot(myChar)
+    if not myRoot then return end
+
+    local viewportSize = Camera.ViewportSize
+    local center = viewportSize / 2
+    local radius = math.min(viewportSize.X, viewportSize.Y) * cfg.arrowRadiusPct
+
+    for player, elements in pairs(espPlayers) do
+        local char = player.Character
+        local root = getRoot(char)
+        local hum  = getHum(char)
+
+        if not char or not root or not hum or hum.Health <= 0 then
+            elements.ScreenSpace.Visible = false
+            elements.ArrowFrame.Visible  = false
+            elements.ArrowDist.Visible   = false
+            continue
+        end
+
+        local dist = math.floor((myRoot.Position - root.Position).Magnitude)
+        if dist > cfg.maxDist then
+            elements.ScreenSpace.Visible = false
+            elements.ArrowFrame.Visible  = false
+            elements.ArrowDist.Visible   = false
+            continue
+        end
+
+        local hpPct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+        local hpColor = getHpColor(hpPct)
+
+        local headPos = root.Position + Vector3.new(0, 3.5, 0)
+        local screenPos, rawOnScreen = Camera:WorldToViewportPoint(headPos)
+        local onScreen = rawOnScreen and (screenPos.X > 0 and screenPos.X < viewportSize.X and screenPos.Y > 0 and screenPos.Y < viewportSize.Y)
+
+        if onScreen and cfg.espEnabled then
+            elements.ArrowFrame.Visible  = false
+            elements.ArrowDist.Visible   = false
+
+            elements.ScreenSpace.Position = UDim2.new(0, screenPos.X - 50, 0, screenPos.Y - 25)
+            elements.HPFill.Size = UDim2.new(hpPct, 0, 1, 0)
+            elements.HPFill.BackgroundColor3 = hpColor
+            elements.DistLabel.Text = dist .. "m"
+            elements.ScreenSpace.Visible = true
+            
+        elseif cfg.arrowsEnabled then
+            elements.ScreenSpace.Visible = false
+
+            local dir = (Vector2.new(screenPos.X, screenPos.Y) - center).Unit
+            if screenPos.Z < 0 then 
+                dir = -dir 
+            end
+
+            local arrowPos = center + dir * radius
+            local angle = math.atan2(dir.Y, dir.X)
+            local rotationDegrees = math.deg(angle) + 90
+
+            elements.ArrowFrame.Position = UDim2.new(0, arrowPos.X, 0, arrowPos.Y)
+            elements.ArrowFrame.Rotation = rotationDegrees
+
+            elements.ArrowImage.ImageColor3 = hpColor
+            elements.ArrowFrame.Visible = true
+
+            local textPos = arrowPos + dir * 28
+            elements.ArrowDist.Position = UDim2.new(0, textPos.X, 0, textPos.Y)
+            elements.ArrowDist.Text = dist .. "m"
+            elements.ArrowDist.TextColor3 = shared.currentChromaColor
+            elements.ArrowDist.Visible = true
+        else
+            elements.ScreenSpace.Visible = false
+            elements.ArrowFrame.Visible  = false
+            elements.ArrowDist.Visible   = false
+        end
+    end
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do 
+    addPlayerESP(player) 
+end
+
+Players.PlayerAdded:Connect(addPlayerESP)
+Players.PlayerRemoving:Connect(removePlayerESP)
+
+print("[Nexus GitHub Core]: Модуль ImageLabel + Киллаура запущены и синхронизированы!")
